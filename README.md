@@ -2,6 +2,12 @@
 
 This project implements three deep learning approaches for unsupervised music generation using the MAESTRO v3.0.0 dataset.
 
+Project Members: 
+1. Pretom Areefin Pranto
+2. Md. Musfikur Rahman Sifar
+3. Md. Rizwanul Mushfiq 
+
+
 ## Project Structure
 
 ```

@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# PyTorch
+*.pth
+*.pt
+*.ckpt
+
+# Data files (large)
+data/processed/*.npy
+# data/raw_midi/*.mid
+# data/raw_midi/*.midi
+all_year_files/*.midi
+all_year_files/*.mid
+
+# Model checkpoints (optional - uncomment if too large)
+# all_outputs/models/*.pth
+# all_outputs/models/*.pt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Project specific
+*.wav
+*.mp3
+*.flac
+
+# Keep important outputs but ignore temporary ones
+all_outputs/generated_midis/tmp_*
+all_outputs/generated_midis/test_*

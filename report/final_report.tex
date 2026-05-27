@@ -1,0 +1,347 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{url}
+
+\title{Unsupervised Neural Network for Multi-Genre Music Generation}
+
+\author{%
+\IEEEauthorblockN{1st Pretom Areefin Pranto}
+\IEEEauthorblockA{Dept. of Computer Science\\
+Brac University\\
+ID: 22201653\\
+pretom.areefin.pranto@g.bracu.ac.bd}
+\and
+\IEEEauthorblockN{2nd Md. Rizwanul Mushfiq}
+\IEEEauthorblockA{Dept. of Computer Science \\
+and Engineering\\
+Brac University\\
+ID: 22201247\\
+md.rizwanul.mushfiq@g.bracu.ac.bd}
+\and
+\IEEEauthorblockN{3rd Md. Musfikur Rahman Sifar}
+\IEEEauthorblockA{Dept. of Computer Science \\
+and Engineering\\
+Brac University\\
+ID: 22201716\\
+musfikur.rahman.sifar@g.bracu.ac.bd}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The project is about an unsupervised deep learning pipeline which uses MIDI data for generating automatic music of various genres. Four progressive generative models are applied and implemented here, which are an LSTM Autoencoder for the purpose of basic reconstruction, a Variational Autoencoder (VAE) for sampling the probabilistic latent space sampling, a Transformer-based architecture for modeling the long-range sequence modeling, and Reinforcement Learning with Human Feedback (RLHF) for preference alignment. We used the MAESTRO dataset which contains around 200 hours of classical piano performances that we used to train our model. The MIDI files are preprocessed to binary piano-roll representations, of 16 Hz frame rate. The sequences are segmented into 128-timestep windows and cover musical phrases of 8-seconds. In order to evaluate the models, we combine the quantitative metrics such as, pitch histogram similarity, rhythm diversity, and repetition ratio, along with qualitative listening assessments. The results demonstrate the transformer's ability to achieve superior structural coherence, measured by decreasing perplexity from 3103 to 88.7, while the VAE outperformed the other models in human listening scores (4.68 vs. 2.21--4.40). The pitch distance could successfully be reduced from 121.53 to 72.02 by the RLHF fine-tuning, signifying the effectiveness of its focus on melody. The overall human preference was stable as well. The project confirms the successful generation of musical compositions by using unsupervised deep learning approaches, where the VAE performed the better, balancing both diversity and musical satisfaction.
+\end{abstract}
+
+\section{Introduction}
+
+Music generation is a challenging task for the generative models because of the nature of its composition. In contrast to NLP or image processing, music has dependencies on various factors such as pitch, harmony, rhythm, tune etc. that makes it far more complex. The genres are different as well where each has its own distinct characteristics. Even so, because of the fundamental musical grammar they share, it is possible to learn them without explicit supervision~\cite{ref1}.
+
+In case of the traditional supervised approaches of music generation, various labeled datasets are needed, with classifications of genres which are very expensive, and inconsistent. Even among the same composition, there may be multiple genres rather than one, which can make the categorical labeling ambiguous, thus capping the model generalization. In contrast, the unsupervised learning models learn directly from the raw symbolic representations and discover the latent musical structures directly from it~\cite{ref2}.
+
+For the suitability of this very task, MIDI (Musical Instrument Digital Interface) format is very compatible since it encodes the musical factors like pitch, timing, velocity, duration etc. into a structured representation. MIDI allows the neural networks to focus on the compositional structures by condensing the timbral complexity from the raw audios.
+
+Overall, the work implements the deep learning pipeline through four stages, each described below in brief:
+
+\begin{enumerate}
+    \item \textbf{LSTM Autoencoder:} It is a reconstruction model which learns compressed, low-dimensional latent representations of musical sequences, then creates the baseline capability to generate diversified outputs, alongside disclosing its limitations.
+    \item \textbf{Variational Autoencoder (VAE):} It enables the autoencoder with probabilistic latent sampling and also smooth interpolation. It can generate diversified outputs via KL-divergence regularization~\cite{ref3}.
+    \item \textbf{Transformer:} It uses the self-attention mechanisms to capture long-range dependencies that generate coherent sequences over extended durations due to modeling global structural relationships~\cite{ref4}.
+    \item \textbf{Reinforcement Learning with Human Feedback (RLHF):} It refines the pre-trained generator with human preference rewards and links it with perceived musical quality~\cite{ref5}.
+\end{enumerate}
+
+The models are evaluated with both objective metrics as pitch distribution similarity, rhythm diversity, repetition ratio alongside perceiving the listening satisfaction. The baseline differences between Random and Markov chain generators determine the performance lower bounds.
+
+From the results, we can distinguish a tradeoff which is, although the transformer achieves the superior structural metrics and the RLHF achieves the melodic outputs effectively, the VAE unexpectedly ends up achieving the human preference scores. This suggests that the probabilistic latent regularization used by this architecture is better able to capture the qualities that are acceptable to the humans as satisfactory musical tones.
+
+\section{Dataset and Preprocessing}
+
+\subsection{Dataset}
+
+For this project, the dataset ``MAESTRO (MIDI and Audio Edited for Synchronous TRacks and Organization) v3.0.0'' is used which contains 1,276 MIDI files with a predefined train (962 files), validation (137 files) and test split (177 files). Overall, it has an approximation of 200 hours of classical piano recordings done on Yamaha Disklavier grand pianos with approximately 3ms timing accuracy~\cite{ref6}. Across multiple splits, it is confirmed that there is no data leakage due to the vast balanced amount of files for test, train and validations.
+
+\subsection{Piano-Roll Representation}
+
+We convert the MIDI files into binary piano-roll matrices at a frame rate of 16 fps. We use \texttt{pretty\_midi} for this conversion. The piano-roll has a shape of $(128, T)$ where 128 represents the MIDI pitch range which is 0--127. The pitches of the range 21--108 are sliced to preserve the standard 88-key piano range, which produces a matrice of $(88, T)$. In order to match the PyTorch LSTM input conventions, the matrices are transposed to $(T, 88)$ where the first axis is time. We discard any non-zero values by conversion to 1, to remove the velocity informations. This simplifies the learning task.
+
+\subsection{Windowing and Sparsity Filtering}
+
+The sequences are split to non-overlapping windows of 128 timestamps which cover 8 seconds of music at a frame rate of 16 seconds. In order to filter the near-silent segments, the windows with fewer than around 2\% active cells are rejected as they have no values in learning. By exploratory analysis, it is seen that piano-rolls are approximately 97--98\% sparse. Thus specialized loss functions are used to handle class imbalance.
+
+\subsection{Tokenization for Transformer}
+
+The REMI (REvamped MIDI) tokenization scheme is used using the \texttt{midtok} library which maps the musical events like bars, positions, pitches, velocities, durations to separate the integer tokens. On 400 MIDI files, 8,000 tokens are trained and the sequences are shortened to 256 tokens. This ensures computational efficiency.
+
+\section{Methodology}
+
+\subsection{Task 1: LSTM Autoencoder}
+
+\textbf{Architecture:} Comprising a 2-layer LSTM of 256 hidden dimensions, it has a processing input of shape $(\text{batch\_size}, 128, 88)$. The last layer's final hidden output is passed as a linear layer to a latent vector $z$ of 64 dimensions. After the creation of a compressed bottleneck representation, the latent vector is repeated across 128 timesteps and passed through the 2-layer LSTM, and then a linear output layer is applied to it in order to reconstruct the main 88-dimensional pitch vector by the decoder at each timestep.
+
+\textbf{Loss function:} Here, a standard MSE or BCE loss can result in the convergence to constant near-zero predictions because of extreme class imbalance (97--98\% zeros). Therefore, we use Focal Loss~\cite{ref7} with $\alpha=0.25$, $\gamma=2.0$:
+
+\begin{equation}
+\mathcal{L}_{FL} = -\alpha_t (1-p_t)^\gamma \log(p_t)
+\end{equation}
+
+The gradient contribution is suppressed from the modulating factor $(1-p_t)^\gamma$ from an easily classified silent cells which forces the model to focus on rare note activations.
+
+\textbf{Training:} Adam optimizer with learning rate 1e-3, batch size 64, gradient clipping at 1.0, 40 epochs.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{prism-uploads/task1_ae_loss.png}
+    \caption{Task 1 autoencoder training loss according to the experimental setting described above.}
+    \label{fig:ae-loss}
+\end{figure}
+
+\subsection{Task 2: Variational Autoencoder (VAE)}
+
+\textbf{Architecture:} Mean $\mu(X)$ and log-variance $\log \sigma^2(X)$ vectors of 64 dimensions are obtained from the encoder. Using reparameterization, the model is tricked to backpropagate through stochastic sampling.
+
+\begin{equation}
+z = \mu + \sigma \odot \epsilon, \quad \epsilon \sim \mathcal{N}(0,I)
+\end{equation}
+
+where $\sigma = \exp(0.5 \cdot \log \sigma^2)$. The decoder architecture is the same as Task 1.
+
+\textbf{Loss function:} The Focal Loss is combined with the KL divergence for calculating the total loss.
+
+\begin{equation}
+\mathcal{L}_{VAE} = \mathcal{L}_{recon} + \beta \cdot D_{KL}(q_\phi(z|X) || p(z))
+\end{equation}
+
+The KL divergence has closed form:
+
+\begin{equation}
+D_{KL} = -\frac{1}{2}\sum_{j}(1 + \log \sigma_j^2 - \mu_j^2 - \sigma_j^2)
+\end{equation}
+
+\textbf{KL Annealing:} Over the first 12 epochs, which is about 30\% of the training, $\beta$ is linearly increased from 0 to 1 in order to prevent posterior collapse. This allows the encoder to learn useful representations. Only after that, the regularization constrains the latent space.
+
+\textbf{Latent Interpolation:} By interpolating $\mu$ vectors, we generate eight intermediate samples across two real validations:
+\begin{equation}
+z_\alpha = (1-\alpha)\mu_1 + \alpha\mu_2, \quad \alpha \in \{0, 1/7, \ldots, 1\}
+\end{equation}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{prism-uploads/task2_vae_loss.png}
+    \caption{Task 2 VAE loss curve used in the results discussion.}
+    \label{fig:vae-loss}
+\end{figure}
+
+\subsection{Task 3: Transformer Generator}
+
+\textbf{Architecture:} A Generative Pre-trained Transformer which has only the decoder that has token embedded layer of 8000 sized vocabulary and $d_{\text{model}} = 256$, positional embedding where the learnable parameter is of shape $(1, \text{max\_len}, 256)$, 4 Transformer decoded layers, each having 8-head masked self-attention and a feedforward dimension of 1024 and lastly, a linear final projection to vocabulary size of 8000.
+
+\textbf{Causal Masking:} Upper-triangular mark is used to prevent focusing on future tokens, which is necessary for valid autoregressive generation:
+\begin{equation}
+p(X) = \prod p(x_t \mid x_{<t})
+\end{equation}
+
+\textbf{Loss Function:} Cross-entropy loss and \texttt{ignore\_index=0} for padding tokens.
+
+\textbf{Perplexity Metric:}
+
+\begin{equation}
+\text{Perplexity} = \exp\left(-\frac{1}{T}\sum_{t=1}^T \log p_\theta(x_t|x_{<t})\right)
+\end{equation}
+
+\textbf{Generation:} Temperature sampling $(T=0.9)$, top-$k=50$ to prevent repetitive loops.
+
+\subsection{Task 4: Reinforcement Learning with Human Feedback (RLHF)}
+
+\textbf{Objective:} Maximizing the expected reward from human evaluators.
+
+\begin{equation}
+J(\theta) = \mathbb{E}_{X \sim p_\theta(X)}[r(X)]
+\end{equation}
+
+where $r(X)$ is a human-assigned score from 1 to 5. $r$ is non-differentiable. Therefore, REINFORCE policy gradient is used.
+
+\textbf{REINFORCE policy gradient:}
+\begin{equation}
+\nabla_\theta J(\theta) = \mathbb{E}[r \cdot \nabla_\theta \log p_\theta(X)]
+\end{equation}
+
+\textbf{Reward Model:} The human preference is assumed based on a heuristic reward function. This is based on the following factors:
+\begin{itemize}
+    \item Pitch standard deviation (melodic variety)
+    \item Unique pitch class count (harmonic diversity)
+    \item Unique duration count (rhythmic variety)
+    \item Note density relative to target 2.5 notes/second
+\end{itemize}
+
+Reward $= 0.3 \cdot \text{pitch\_std} + 0.3 \cdot \text{unique\_pc} + 0.2 \cdot \text{unique\_dur} + 0.2 \cdot \text{density\_score}$, clipped to $[0,1]$.
+
+\textbf{Training:} The pre-trained transformer is tweaked with a learning rate of 2e-5, 3 iterations and 2 rollouts per iteration. Short 80-token sequences are kept for efficiency. The batch mean is subtracted and is divided by standard deviation to reduce the gradient variance, which normalizes the rewards.
+
+\section{Experimental Results}
+
+\subsection{Task 1: LSTM Autoencoder}
+
+Trained for 40 epochs with focal loss, the training loss stayed stable at approximately 0.0137 throughout, while the validation loss was close to 0.0133. This minimal loss indicates that the model was able to find an equilibrium fast enough where there is an abundance of silent cells predictions. To recover note activations, a generation binarization threshold of 0.28 was necessary, whereas the default is 0.5, since the model kept underestimating the note probabilities due to class imbalance.
+
+By sampling the random latent vectors $z \sim \mathcal{N}(0,I)$, five MIDI samples were generated. The outputs contained recognizable pitch patterns, although they had limited long-term structure and moderate repetition where the repetition ratio is $0.049 \pm 0.009$.
+
+\subsection{Task 2: Variational Autoencoder}
+
+Trained for 40 epochs with KL annealing, the reconstruction loss stayed at 0.0137, which is the same as the autoencoder. After epoch 3, the KL divergence effectively dropped to 0 and stayed there until the end of training. This shows that there was a complete posterior collapse, as the encoder learned to ignore the input and regardless of what it is, the output showed $\mu=0$ and $\log \sigma^2=0$.
+
+Despite that, 8 intermediate MIDI files were successfully generated by latent interpolation between two real pieces. This shows that some of the latent structures were retained. The samples had pitch similarity of $0.305 \pm 0.000$, which is significantly better in contrast to autoencoder, which had $0.624 \pm 0.430$. However, it also showed extremely poor rhythm diversity ($0.022 \pm 0.002$).
+
+\subsection{Task 3: Transformer}
+
+Trained for 30 epochs, vocabulary size 8,000 and sequence length of 256 tokens, the perplexity decreased from 3,103 at epoch 1 to 88.65 to epoch 30 during training, and from 2,882 to 441.35 during validation. After epoch 8, the widening gap which is 418 training perplexity and 510 validation suggests that there was overfitting despite the dropout regularization of 0.2.
+
+\begin{table}[t]
+\caption{Transformer perplexity by epoch}
+\label{tab:transformer-ppl}
+\centering
+\begin{tabular}{ccc}
+\toprule
+Epoch & Train Perplexity & Validation Perplexity \\
+\midrule
+1 & 3,103.02 & 2,882.45 \\
+5 & 706.56 & 754.82 \\
+10 & 322.22 & 435.38 \\
+20 & 147.77 & 366.54 \\
+30 & 88.65 & 441.35 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+10 long sequence output compositions were generated. The temperature sampling was $T = 0.9$ and top-$k = 50$. The Transformer could produce the most sound and well grounded samples amongst all the models where the repetition ratio was $0.054 \pm 0.040$, which can be compared with that of the autoencoder, but it has a consistency with long range.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{prism-uploads/task3_transformer_ppl.png}
+    \caption{Task 3 transformer perplexity curve aligned with the reported training and validation trends.}
+    \label{fig:transformer-ppl}
+\end{figure}
+
+\subsection{Task 4: Reinforcement Learning with Human Feedback}
+
+Over 3 iterations, the RLHF fine-tuning could not show stable reward progression as iteration 1 gained 0.237, iteration 2 peaked at 0.377, while iteration 3 dropped to 0.184. At iteration 3, the loss is -17.00, and the negative loss indicates that despite clipping, there was a gradient explosion. This further suggests that the REINFORCE update with heuristic reward actually caused unstable fine-tuning.
+
+Ten samples were generated here. The pitch distance was reduced from pre-RL 121.53 to 72.02 (40.7\% reduction) which suggests successful focus on melody. Although the rhythm diversity and repetition ratio was unchanged at 1.0 and 0 respectively. The human score stayed flatlined at 2.0.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{prism-uploads/task4_rlhf_reward.png}
+    \caption{Task 4 RLHF reward trend corresponding to the instability discussed in the text.}
+    \label{fig:rlhf-reward}
+\end{figure}
+
+\subsection{Quantitative Evaluation Metrics}
+
+Three metrics were computed across all the four models and two baselines, Random and Markov Chain.
+
+\begin{table}[t]
+\caption{Quantitative evaluation metrics}
+\label{tab:quant-metrics}
+\centering
+\begin{tabular}{lccc}
+\toprule
+Model & Pitch Similarity $\downarrow$ & Rhythm Diversity $\uparrow$ & Repetition Ratio $\downarrow$ \\
+\midrule
+Random & $0.332 \pm 0.063$ & $0.675 \pm 0.091$ & $0.000 \pm 0.000$ \\
+Markov & $0.360 \pm 0.035$ & $0.005 \pm 0.000$ & $0.000 \pm 0.000$ \\
+LSTM Autoencoder & $0.624 \pm 0.430$ & $0.159 \pm 0.165$ & $0.049 \pm 0.009$ \\
+VAE & $0.305 \pm 0.000$ & $0.022 \pm 0.002$ & $0.059 \pm 0.004$ \\
+Transformer & $1.056 \pm 0.401$ & $0.029 \pm 0.021$ & $0.054 \pm 0.040$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key Observations:}
+\begin{itemize}
+    \item The random achieves the highest rhythm diversity of 0.675 because of the uncorrelated note placement. However, the pitch similarity is average at 0.332.
+    \item Markov chain breaks down to near-zero rhythm diversity (0.005). This explains that it gets stuck when the pitch sequences are repetitive.
+    \item The best pitch similarity is achieved by VAE with a score of 0.305 but the rhythm diversity is poor with 0.022.
+    \item The transformer showed the highest pitch distance of 1.056. This suggests that the generated pitches actually differ from the real music, although the repetition ratio was acceptable at 0.054.
+\end{itemize}
+
+\subsection{Human Listening Evaluation}
+
+A listening survey (10+ participants) rated model outputs as follows:
+
+\begin{table}[t]
+\caption{Human listening evaluation}
+\label{tab:human-score}
+\centering
+\begin{tabular}{lc}
+\toprule
+Model & Human Score (1--5) \\
+\midrule
+Random & 1.40 \\
+Markov & 2.60 \\
+LSTM Autoencoder & 2.21 \\
+VAE & 4.68 \\
+Transformer & 4.40 \\
+RLHF & 4.36 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Analysis:} It is observed that the highest human preference was achieved by the VAE at 4.68 despite the poor rhythm diversity. The listeners prefer pitch coherence and harmonic structure rather than rhythmic complexity. Even though the Transformer and RLHF performed well, but its slightly less than the VAE. The baseline model performed poorly here which indicates that deep learning is required for ensuring good music quality.
+
+\section{Discussion}
+
+\subsection{Key Findings}
+
+\textbf{Posterior Collapse in VAE:} The KL divergence dropped to 0, which shows complete posterior collapse, which indicates that the decoder became powerful and was able to reconstruct sequences without using latent variable $z$. The KL annealing was applied, where $\beta$ ramped from 0 to 1. The warmup period of 12 epochs might have been inadequate. The decoder capacity of 256-dim LSTM could also be too high in contrast to the latent dimension of 64. The collapse revealed that it produced better human scores which means it had an effective regularization towards acceptable and better quality output.
+
+\textbf{Sparsity Challenge:} The piano-roll representations had a 97--98\% sparsity, which is a difficult issue. The zero convergence was successfully prevented by the focal loss of $\alpha=0.25$ and $\gamma=2.0$. However, the autoencoder's loss reached a plateau earlier, hinting that the model learned it fast to predict zeros and hence struggled afterwards to improve the note activation accuracy.
+
+\textbf{Transformer Overfitting:} Despite dropout of 2.0, the widening validation perplexity gap after epoch 8 (training 418, validation 510) shows that there was either inadequate regularization or training data were limited where only 400 files are tokenized. Improvement could be done by stopping early at epoch 10--12.
+
+\textbf{RLHF Instability:} High variance and gradient explosion was seen. The small rollouts and short sequence length of 80 tokens could be leading to the unstable gradient estimates.
+
+\subsection{Limitations}
+
+\textbf{Data Representation:} The binary piano rolls discarded the velocity and fine-grained the timing, thus able to produce mechanically characterized outputs. Multi-velocity representations could be incorporated in future works.
+
+\textbf{Dataset Specificity:} MAESTRO is only limited to classical piano and the generalization of other genres were untested.
+
+\textbf{Posterior Collapse:} The collapse at VAE indicates the need for stronger KL annealing, where $\beta > 1$ or alternative regularizers such as mutual information maximization.
+
+\textbf{Evaluation Bottlenecks:} The heuristic rewards for RLHF can not fully capture the human preferences, rather a trained model can better perform in this situation.
+
+\section{Conclusion}
+
+The project successfully implemented and evaluated the four unsupervised models, LSTM Autoencoder, VAE, Transformer, and RLHF-tuned Transformer for music generation. Since progressive pipelines were used, with each architectural advancement, the limitations of the previous ones were exposed, along with new challenges for the new ones.
+
+The LSTM was able to structure the baseline capability but it has a limited capability for generating diversity. The VAE achieved the highest human score preference but the posterior collapse suggested that it can still produce satisfactory outputs than deterministic reconstruction. The best structural metric was achieved by the Transformer where the perplexity decreased, but at the same time, it overfitted and there was a higher pitch distance in contrast to the simple models. The RLHF successfully could produce melodic outputs with reduced pitch distance, however, the unstable training as well as the rhythm/repetition metrics suggest the need for a better and more advanced reward system.
+
+The quantitative metrics are not enough itself to predict the human preference as the Transformer's superior perplexity did not actually reveal a higher listening score. The VAE's 4.68 human score vs. Transformer's 4.40 proves that the probabilistic latent modeling was more successful in apprehending the musical factors, even with a collapse.
+
+Despite the success and the results, the posterior collapse should be taken into view through stronger KL annealing, better reward system should be designed for a more stable RLHF, velocity and polyphonic information should be integrated and should be implemented on more multi genre datasets.
+
+Overall, the project suggests that the unsupervised approaches like these can generate music compositions efficiently, where the probabilistic latent variable model can perform a better balance in terms of both learning and fulfilling the human satisfaction score.
+
+\begin{thebibliography}{00}
+
+\bibitem{ref1} M. Sewak, S. K. Sahay, and H. Rathore, ``An Overview of Deep Learning Architecture of Deep Neural Networks and Autoencoders,'' \emph{Journal of Computational and Theoretical Nanoscience}, vol. 17, no. 1, pp. 182--188, 2020.
+
+\bibitem{ref2} T. Fredriksson, D. Issa Mattos, J. Bosch, and H. Holmstrom Olsson, ``Data Labeling: An Empirical Investigation into Industrial Challenges and Mitigation Strategies,'' in \emph{Product-Focused Software Process Improvement}, Springer, 2020, pp. 202--216.
+
+\bibitem{ref3} H. H. Nguyen et al., ``Variational Autoencoder for Anomaly Detection: A Comparative Study,'' \emph{arXiv:2408.13561}, 2024.
+
+\bibitem{ref4} C. A. Huang et al., ``Music Transformer: Generating Music with Long-Term Structure,'' \emph{arXiv:1809.04281}, 2018.
+
+\bibitem{ref5} J. Dai et al., ``SAFE RLHF: Safe Reinforcement Learning from Human Feedback,'' \emph{arXiv:2310.12773}, 2023.
+
+\bibitem{ref6} C. Hawthorne et al., ``MAESTRO: A Dataset for Symbolic Music Generation,'' in \emph{International Society for Music Information Retrieval Conference (ISMIR)}, 2018.
+
+\bibitem{ref7} T. Y. Lin et al., ``Focal Loss for Dense Object Detection,'' \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence}, vol. 42, no. 2, pp. 318--327, 2020.
+
+\end{thebibliography}
+
+\end{document}

@@ -241,9 +241,9 @@ If you use this code, please cite:
 ```bibtex
 @misc{music-generation-unsupervised,
   title={Unsupervised Music Generation with Deep Learning},
-  author={Your Name},
+  author={Pretom Areefin Pranto},{Md. Rizwanul Mushfiq},{Md. Musfikur Rahman Sifar}
   year={2026},
-  howpublished={\url{https://github.com/yourusername/music-generation-unsupervised}}
+  howpublished={\url[{(https://github.com/pretom26/CSE425-Neural-Network-Project-Music-Generation-Using-Unsupervised-Learning/)}
 }
 ```
 

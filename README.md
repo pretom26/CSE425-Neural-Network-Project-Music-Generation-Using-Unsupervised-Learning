@@ -240,12 +240,12 @@ If you use this code, please cite:
 
 ```bibtex
 @misc{music-generation-unsupervised,
-  title={Unsupervised Music Generation with Deep Learning},
-  author={Pretom Areefin Pranto},{Md. Rizwanul Mushfiq},{Md. Musfikur Rahman Sifar}
-  year={2026},
-  howpublished={\url[{(https://github.com/pretom26/CSE425-Neural-Network-Project-Music-Generation-Using-Unsupervised-Learning/)}
+  title        = {Unsupervised Music Generation with Deep Learning},
+  author       = {Pranto, Pretom Areefin and Mushfiq, Md. Rizwanul and Sifar, Md. Musfikur Rahman},
+  year         = {2026},
+  howpublished = {\url{https://github.com/pretom26/CSE425-Neural-Network-Project-Music-Generation-Using-Unsupervised-Learning/}}
 }
-```
+
 
 ## Dataset Citation
 
